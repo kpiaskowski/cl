@@ -8,7 +8,6 @@ from constants import log_ckpt, batch_size, save_ckpt
 from dataprovider import DataProvider
 from network import UNet
 
-# todo unused -> use it!
 PATH_TO_LOCAL_LOGS = os.path.expanduser('~/Documents/logs')
 ROOT_PATH_TO_LOCAL_DATA = os.path.expanduser('~/Documents/data/')
 
@@ -39,12 +38,12 @@ flags.DEFINE_string("worker_hosts", worker_hosts,
                     "Comma-separated list of hostname:port pairs")
 
 # Training related flags
-# todo define proper paths and names
+# todo ask why datasets wont load in Matrix
 flags.DEFINE_string("data_dir",
                     get_data_path(
-                        dataset_name="malo/mnist",  # all mounted repo
+                        dataset_name="kpiaskowski/test_dataset",  # all mounted repo
                         local_root=ROOT_PATH_TO_LOCAL_DATA,
-                        local_repo="mnist",
+                        local_repo="test_dataset",
                         path='data'
                     ),
                     "Path to store logs and checkpoints. It is recommended"
@@ -99,7 +98,7 @@ def device_and_target():
     )
 
 
-def network_model(learning_rate):
+def train(learning_rate):
     if FLAGS.log_dir is None or FLAGS.log_dir == "":
         raise ValueError("Must specify an explicit `log_dir`")
     if FLAGS.data_dir is None or FLAGS.data_dir == "":
@@ -122,7 +121,6 @@ def network_model(learning_rate):
         loss = tf.losses.mean_squared_error(labels=target_img, predictions=generated_imgs)
         global_step = tf.train.create_global_step()
 
-        # summaries
         # concatenated base, generated and target img
         concat_img = tf.concat([base_img, generated_imgs, target_img], 2)
 
@@ -132,6 +130,7 @@ def network_model(learning_rate):
         loss_merged = tf.summary.merge([loss_summary])
         img_merged = tf.summary.merge([img_summary])
 
+        # use batchnorm and gradient clipping
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
@@ -194,7 +193,7 @@ def network_model(learning_rate):
 
 
 def main(unused_argv):
-    network_model(learning_rate=0.0001)
+    train(learning_rate=0.0001)
 
 
 if __name__ == '__main__':
