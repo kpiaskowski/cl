@@ -10,6 +10,7 @@ from network import UNet
 
 PATH_TO_LOCAL_LOGS = os.path.expanduser('~/Documents/logs')
 ROOT_PATH_TO_LOCAL_DATA = os.path.expanduser('~/Documents/data/')
+CHIEF_INDEX = 0
 
 # Configure  distributed task
 try:
@@ -29,9 +30,7 @@ flags = tf.app.flags
 flags.DEFINE_string("job_name", job_name,
                     "job name: worker or ps")
 flags.DEFINE_integer("task_index", task_index,
-                     "Worker task index, should be >= 0. task_index=0 is "
-                     "the chief worker task that performs the variable "
-                     "initialization and checkpoint handling")
+                     "worker task index, should be >= 0 (0 for chief)")
 flags.DEFINE_string("ps_hosts", ps_hosts,
                     "Comma-separated list of hostname:port pairs")
 flags.DEFINE_string("worker_hosts", worker_hosts,
@@ -46,30 +45,20 @@ flags.DEFINE_string("data_dir",
                         local_repo="test_dataset",
                         path='data'
                     ),
-                    "Path to store logs and checkpoints. It is recommended"
-                    "to use get_logs_path() to define your logs directory."
-                    "so that you can switch from local to clusterone without"
-                    "changing your code."
-                    "If you set your logs directory manually make sure"
-                    "to use /logs/ when running on ClusterOne cloud.")
+                    "Path to store logs and checkpoints")
 flags.DEFINE_string("log_dir",
                     get_logs_path(root=PATH_TO_LOCAL_LOGS),
-                    "Path to dataset. It is recommended to use get_data_path()"
-                    "to define your data directory.so that you can switch "
-                    "from local to clusterone without changing your code."
-                    "If you set the data directory manually makue sure to use"
-                    "/data/ as root path when running on ClusterOne cloud.")
+                    "Path to dataset")
 FLAGS = flags.FLAGS
 
 
 def device_and_target():
-    # If FLAGS.job_name is not set, we're running single-machine TensorFlow.
-    # Don't set a device.
+    # for single machine
     if FLAGS.job_name is None:
         print("Running single-machine training")
         return (None, "")
 
-    # Otherwise we're running distributed TensorFlow
+    # for distributed TensorFlow
     print("Running distributed training")
     if FLAGS.task_index is None or FLAGS.task_index == "":
         raise ValueError("Must specify an explicit `task_index`")
@@ -99,16 +88,12 @@ def device_and_target():
 
 
 def train(learning_rate):
-    if FLAGS.log_dir is None or FLAGS.log_dir == "":
-        raise ValueError("Must specify an explicit `log_dir`")
-    if FLAGS.data_dir is None or FLAGS.data_dir == "":
-        raise ValueError("Must specify an explicit `data_dir`")
-
     tf.reset_default_graph()
     device, target = device_and_target()  # getting node environment
-    with tf.device(device):  # define model
-        # get data provider
-        dataprovider = DataProvider('data', batch_size=batch_size)
+
+    # define model
+    with tf.device(device):
+        dataprovider = DataProvider('data', batch_size=batch_size)  # todo change temp data folder when know why datasets wont load in Matrix
 
         # create data handles
         handle, train_iter, val_iter, base_img, target_img, target_angle = dataprovider.dataset_handles()
@@ -143,7 +128,6 @@ def train(learning_rate):
         train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_train'))
         val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_val'))
 
-    # Using tensorflow's MonitoredTrainingSession to take care of checkpoints
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
     saver_hook = tf.train.CheckpointSaverHook(
         checkpoint_dir=os.path.join(FLAGS.log_dir, dirname),
@@ -155,12 +139,12 @@ def train(learning_rate):
     hooks = [stop_hook, saver_hook]
 
     """I tried to find as easy an elegant solution, how to restore model from checkpoint when using ALSO feedable iterators for dataset, but to no avail.
-    The problem is that MonitoredTrainingSesssion seems to have problems with initializing those iterators after restore. The solutions I found are rather not elegant workaround,
+    The problem is that MonitoredTrainingSesssion seems to have problems with initializing those iterators after restore. The solutions I found are rather not elegant workarounds,
     therefore I decided to leave it without restoring (I decided that flexibility of feedable iterators is more important for this exemplary task. I wrote however inference.py script
     to check wheter saved models work fine - they do."""
     with tf.train.MonitoredTrainingSession(
             master=target,
-            is_chief=(FLAGS.task_index == 0),
+            is_chief=(FLAGS.task_index == CHIEF_INDEX),
             checkpoint_dir=None,
             hooks=hooks) as sess:
 
@@ -170,14 +154,15 @@ def train(learning_rate):
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)
+            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
 
-            if FLAGS.task_index == 0:
+            # write train logs evey iteration
+            if FLAGS.task_index == CHIEF_INDEX:
                 train_writer.add_summary(summ, step)
 
-            # every log_ckpt steps, log heavier data, like images (also from validation set)
+            # every log_ckpt steps, log heavier data, like images (and also from validation logs)
             if step % log_ckpt == 0:
-                # get loss and imgs on validation set
+                # get imgs and loss on validation set
                 cost, step, loss_summ_val, img_summ_val = sess.run([loss, global_step, loss_merged, img_merged],
                                                                    feed_dict={handle: v_handle, is_training: False})
                 print('Validation: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)
@@ -186,13 +171,18 @@ def train(learning_rate):
                 step, img_summ_train = sess.run([global_step, img_merged], feed_dict={handle: v_handle, is_training: False})
 
                 # dump logs
-                if FLAGS.task_index == 0:
+                if FLAGS.task_index == CHIEF_INDEX:
                     val_writer.add_summary(loss_summ_val, step)
                     val_writer.add_summary(img_summ_val, step)
                     train_writer.add_summary(img_summ_train, step)
 
 
 def main(unused_argv):
+    if FLAGS.log_dir is None or FLAGS.log_dir == "":
+        raise ValueError("Must specify an explicit `log_dir`")
+    if FLAGS.data_dir is None or FLAGS.data_dir == "":
+        raise ValueError("Must specify an explicit `data_dir`")
+
     train(learning_rate=0.0001)
 
 
