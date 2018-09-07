@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 import tensorflow as tf
 from clusterone import get_data_path, get_logs_path
@@ -123,14 +124,13 @@ def train(learning_rate):
             capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs if grad is not None]
             train_op = optimizer.apply_gradients(capped_gvs, global_step=global_step)
 
-        # saver = tf.train.Saver(max_to_keep=3)
-        dirname = str(int(random.randint(0, 100000)))
-        train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_train'))
-        val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_val'))
+        dirname = time.strftime("%Y_%m_%d_%H:%M")
+        train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_train'))
+        val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_val'))
 
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
     saver_hook = tf.train.CheckpointSaverHook(
-        checkpoint_dir=os.path.join(FLAGS.log_dir, dirname),
+        checkpoint_dir=os.path.join(FLAGS.log_dir, 'saved_models', dirname),
         save_secs=None,
         save_steps=save_ckpt,
         saver=tf.train.Saver(max_to_keep=3),
@@ -154,7 +154,8 @@ def train(learning_rate):
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
+            if FLAGS.task_index == CHIEF_INDEX:
+                print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
 
             # write train logs evey iteration
             if FLAGS.task_index == CHIEF_INDEX:
