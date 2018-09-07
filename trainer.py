@@ -156,7 +156,7 @@ def train(learning_rate):
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
+            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost))  # flush used only to make sure outputs in Matrix are most current and fresh
 
             # write train logs evey iteration
             if FLAGS.task_index == CHIEF_INDEX:
@@ -167,7 +167,7 @@ def train(learning_rate):
                 # get imgs and loss on validation set
                 cost, step, loss_summ_val, img_summ_val = sess.run([loss, global_step, loss_merged, img_merged],
                                                                    feed_dict={handle: v_handle, is_training: False})
-                print('Validation: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)
+                print('Validation: iteration: {}, loss: {:.5f}'.format(step, cost))
 
                 # get only images from training set
                 step, img_summ_train = sess.run([global_step, img_merged], feed_dict={handle: v_handle, is_training: False})
