@@ -125,8 +125,9 @@ def train(learning_rate):
             train_op = optimizer.apply_gradients(capped_gvs, global_step=global_step)
 
         dirname = time.strftime("%Y_%m_%d_%H:%M")
-        train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_train'))
-        val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_val'))
+        if FLAGS.task_index == CHIEF_INDEX:
+            train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_train'))
+            val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_val'))
 
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
     saver_hook = tf.train.CheckpointSaverHook(
@@ -154,8 +155,7 @@ def train(learning_rate):
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            if FLAGS.task_index == CHIEF_INDEX:
-                print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
+            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
 
             # write train logs evey iteration
             if FLAGS.task_index == CHIEF_INDEX:
