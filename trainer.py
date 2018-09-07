@@ -126,12 +126,12 @@ def train(learning_rate):
 
         dirname = time.strftime("%Y_%m_%d_%H:%M")
         if FLAGS.task_index == CHIEF_INDEX:
-            train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_train'))
-            val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_val'))
+            train_writer = tf.summary.FileWriter(os.path.join(FLAGS.FLAGS.data_dir, 'tblogs', dirname + '_train'))
+            val_writer = tf.summary.FileWriter(os.path.join(FLAGS.FLAGS.data_dir, 'tblogs', dirname + '_val'))
 
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
     saver_hook = tf.train.CheckpointSaverHook(
-        checkpoint_dir=os.path.join(FLAGS.log_dir, 'saved_models', dirname),
+        checkpoint_dir=os.path.join(FLAGS.FLAGS.data_dir, 'saved_models', dirname),
         save_secs=None,
         save_steps=save_ckpt,
         saver=tf.train.Saver(max_to_keep=3),
