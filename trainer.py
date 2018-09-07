@@ -151,7 +151,8 @@ def train(learning_rate):
 
         # initialize dataset handles
         t_handle, v_handle = sess.run([train_iter.string_handle(), val_iter.string_handle()])
-        train_writer.add_graph(sess.graph)
+        if FLAGS.task_index == CHIEF_INDEX:
+            train_writer.add_graph(sess.graph)
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
