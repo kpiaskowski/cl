@@ -126,7 +126,7 @@ def train(learning_rate):
 
         dirname = time.strftime("%Y_%m_%d_%H:%M")
         if FLAGS.task_index == CHIEF_INDEX:
-            train_writer = tf.summary.FileWriter(os.path.join('/data/', 'tblogs', dirname + '_train'))
+            train_writer = tf.summary.FileWriter(os.path.join('/data', 'tblogs', dirname + '_train'))
             val_writer = tf.summary.FileWriter(os.path.join(FLAGS.FLAGS.data_dir, 'tblogs', dirname + '_val'))
 
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
