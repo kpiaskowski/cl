@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 import tensorflow as tf
 from clusterone import get_data_path, get_logs_path
@@ -124,13 +125,14 @@ def train(learning_rate):
             train_op = optimizer.apply_gradients(capped_gvs, global_step=global_step)
 
         # saver = tf.train.Saver(max_to_keep=3)
-        dirname = str(int(random.randint(0, 100000)))
-        train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_train'))
-        val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, dirname + '_val'))
+        dirname = time.strftime("%Y_%m_%d_%H:%M")
+        if FLAGS.task_index == CHIEF_INDEX:
+            train_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_train'))
+            val_writer = tf.summary.FileWriter(os.path.join(FLAGS.log_dir, 'tblogs', dirname + '_val'))
 
     stop_hook = tf.train.StopAtStepHook(last_step=1000000)
     saver_hook = tf.train.CheckpointSaverHook(
-        checkpoint_dir=os.path.join(FLAGS.log_dir, dirname),
+        checkpoint_dir=os.path.join(FLAGS.log_dir, 'saved_models', dirname),
         save_secs=None,
         save_steps=save_ckpt,
         saver=tf.train.Saver(max_to_keep=3),
@@ -150,28 +152,28 @@ def train(learning_rate):
 
         # initialize dataset handles
         t_handle, v_handle = sess.run([train_iter.string_handle(), val_iter.string_handle()])
-        train_writer.add_graph(sess.graph)
+        if FLAGS.task_index == CHIEF_INDEX:
+            train_writer.add_graph(sess.graph)
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)  # flush used only to make sure outputs in Matrix are most current and fresh
+            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost))  # flush used only to make sure outputs in Matrix are most current and fresh
 
             # write train logs evey iteration
             if FLAGS.task_index == CHIEF_INDEX:
                 train_writer.add_summary(summ, step)
 
             # every log_ckpt steps, log heavier data, like images (and also from validation logs)
-            if step % log_ckpt == 0:
-                # get imgs and loss on validation set
-                cost, step, loss_summ_val, img_summ_val = sess.run([loss, global_step, loss_merged, img_merged],
-                                                                   feed_dict={handle: v_handle, is_training: False})
-                print('Validation: iteration: {}, loss: {:.5f}'.format(step, cost), flush=True)
+                if step % log_ckpt == 0:
+                    # get imgs and loss on validation set
+                    cost, step, loss_summ_val, img_summ_val = sess.run([loss, global_step, loss_merged, img_merged],
+                                                                       feed_dict={handle: v_handle, is_training: False})
+                    print('Validation: iteration: {}, loss: {:.5f}'.format(step, cost))
 
-                # get only images from training set
-                step, img_summ_train = sess.run([global_step, img_merged], feed_dict={handle: v_handle, is_training: False})
+                    # get only images from training set
+                    step, img_summ_train = sess.run([global_step, img_merged], feed_dict={handle: v_handle, is_training: False})
 
-                # dump logs
-                if FLAGS.task_index == CHIEF_INDEX:
+                    # dump logs
                     val_writer.add_summary(loss_summ_val, step)
                     val_writer.add_summary(img_summ_val, step)
                     train_writer.add_summary(img_summ_train, step)
