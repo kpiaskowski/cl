@@ -44,7 +44,7 @@ flags.DEFINE_string("data_dir",
                         dataset_name="kpiaskowski/test_dataset",  # all mounted repo
                         local_root=ROOT_PATH_TO_LOCAL_DATA,
                         local_repo="test_dataset",
-                        path='data'
+                        path='train'
                     ),
                     "Path to store logs and checkpoints")
 flags.DEFINE_string("log_dir",
