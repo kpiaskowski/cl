@@ -36,7 +36,7 @@ class UNet:
             shortcut2 = tf.tile(shortcut2, [batch_size, 1, 1, 1])
             shortcut2 = tf.nn.sigmoid(conv2 * shortcut2)
 
-            conv3 = tf.layers.conv2d(conv2, 256, 3, padding='same', activation=None, name='econv3')
+            conv3 = tf.layers.conv2d(conv2, 256, 3, padding='same', activation=None)
             conv3 = tf.layers.batch_normalization(conv3, training=is_training, fused=True)
             conv3 = activation(conv3)
             conv3 = tf.layers.max_pooling2d(conv3, 2, 2)

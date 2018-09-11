@@ -1,5 +1,4 @@
 import os
-import random
 import time
 
 import tensorflow as tf
@@ -157,7 +156,7 @@ def train(learning_rate):
 
         while not sess.should_stop():
             cost, _, step, summ = sess.run([loss, train_op, global_step, loss_merged], feed_dict={handle: t_handle, is_training: True})
-            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost))  # flush used only to make sure outputs in Matrix are most current and fresh
+            print('Training: iteration: {}, loss: {:.5f}'.format(step, cost))
 
             # write train logs evey iteration
             if FLAGS.task_index == CHIEF_INDEX:
